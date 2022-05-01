@@ -1,0 +1,109 @@
+#!/bin/bash
+# compress given image with sequential, mpi, or omp implementation
+
+function print_usage {
+    echo "Usage: compress [help|image] [seq|mpi|omp] [n]"
+    echo ""
+    echo "help:  print this message"
+    echo "image: name of image to compress"
+    echo "seq:   run sequential implementation"
+    echo "mpi:   run parallel implementation with the given number of mpi tasks"
+    echo "omp:   run omp implementation"
+    echo "n:     number of mpi tasks to use, omit for max possible tasks"
+}
+
+function check_executable {
+    if [[ ! -f "$1" ]]
+    then
+        echo "Executable $1 not found, running make"
+        echo ""
+        make
+    fi
+}
+
+function run_seq {
+    check_executable "seq-mpi-bin"
+    if [[ $ALL -eq 1 ]]
+    then
+        for filename in raw_images/*.png; do
+            IMAGE=$(basename $filename ".png")
+            echo ""
+            echo "Compressing $IMAGE"
+            ./seq-mpi-bin $IMAGE
+        done
+    else
+        echo ""
+        echo "Compressing $IMAGE"
+        ./seq-mpi-bin $IMAGE
+    fi
+}
+
+function run_mpi {
+    check_executable "seq-mpi-bin"
+    if [[ $ALL -eq 1 ]]
+    then
+        for filename in raw_images/*.png; do
+            IMAGE=$(basename $filename ".png")
+            echo ""
+            echo "Compressing $IMAGE"
+            mpirun -np "$1" ./seq-mpi-bin $IMAGE -p
+        done
+    else
+        echo ""
+        echo "Compressing $IMAGE"
+        mpirun -np "$1" ./seq-mpi-bin $IMAGE -p
+    fi
+}
+
+function run_omp {
+    check_executable "omp-bin"
+    if [[ $ALL -eq 1 ]]
+    then
+        for filename in raw_images/*.png; do
+            IMAGE=$(basename $filename ".png")
+            echo ""
+            echo "Compressing $IMAGE"
+            ./omp-bin $IMAGE -o
+        done
+    else
+        echo ""
+        echo "Compressing $IMAGE"
+        ./omp-bin $IMAGE -o
+    fi
+}
+
+if [[ -z "$1" ]] || [[ "$1" = "help" ]]
+then
+    print_usage
+    exit
+fi
+
+ALL=0
+
+if [[ "$1" = "all" ]]
+then
+    ALL=1
+elif [[ ! -f "raw_images/$1.png" ]]
+then
+    echo "Image $1 not found, available images are:"
+    echo ""
+    for filename in raw_images/*.png; do
+        echo $(basename $filename ".png")
+    done
+    exit
+fi
+
+IMAGE="$1"
+
+if [[ "$2" = "seq" ]]
+then
+    run_seq
+elif [[ "$2" = "mpi" ]]
+then
+    run_mpi "$3"
+elif [[ "$2" = "omp" ]]
+then
+    run_omp
+else
+    print_usage
+fi
